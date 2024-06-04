@@ -1,5 +1,6 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { UserContext } from '../userContext';
+import Order from '../Order/Order';
 
 const Dashboard = () => {
     const userContext = useContext(UserContext);
@@ -8,18 +9,33 @@ const Dashboard = () => {
     let [completedOrders, setcompletedOrders] = useState([]);
     let [inProgressOrders, setinProgressOrders] = useState([]);
 
+    const loadProducts = useCallback(() => fetch('http://localhost:5000/orders?userId=' + (user.info?.id || 1)).then(async r => {
+        if (r.ok) {
+            const res = await r.json();
+            setorders(res);
+            setcompletedOrders(res.filter((i) => i.paymentCompleted));
+            setinProgressOrders(res.filter((i) => !i.paymentCompleted));
+        }
+    }), [user.info])
     useEffect(() => {
-        fetch('http://localhost:5000/orders?userId=' + user.info.id).then(async r => {
+        loadProducts();
+    }, [loadProducts]);
+
+    const onOrderDelete = (item) => {
+        const productToUpdate = JSON.parse(JSON.stringify(item));
+        productToUpdate.paymentCompleted = true;
+        fetch('http://localhost:5000/orders?orderId=' + productToUpdate.orderId, {
+            method: 'PUT',
+            body: JSON.stringify(productToUpdate),
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        }).then(r => {
             if (r.ok) {
-                const res = await r.json();
-                setorders(res);
-                setcompletedOrders(res.filter((i) => i.paymentCompleted));
-                setinProgressOrders(res.filter((i) => !i.paymentCompleted));
+                loadProducts();
             }
         })
-    }, [user.info.id]);
-
-
+    }
     return (
         <React.Fragment>
             {
@@ -30,7 +46,7 @@ const Dashboard = () => {
                                 <div className='card-header'>Previous Orders</div>
                                 <div className='card-body'>
                                     <ul>
-                                        {completedOrders.map((item, ind) => <li key={ind}>{item.id}</li>)}
+                                        {completedOrders.map((item, ind) => <li key={ind}><Order id={item.id}></Order></li>)}
                                     </ul>
                                 </div>
                             </div>
@@ -43,7 +59,7 @@ const Dashboard = () => {
                                 <div className='card-header'>Card Items</div>
                                 <div className='card-body'>
                                     <ul>
-                                        {inProgressOrders.map((item, i) => <li key={i}>{item.id}</li>)}
+                                        {inProgressOrders.map((item, i) => <li key={i}><Order id={item.id} onOrderDelete={() => onOrderDelete(item)}></Order></li>)}
                                     </ul>
                                 </div>
                             </div>
